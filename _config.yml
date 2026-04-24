@@ -1,0 +1,22 @@
+title: "SSL · Soul Specification Language"
+description: "Per-tenant AI agent calibration, formally specified."
+theme: jekyll-theme-minimal
+show_downloads: false
+
+author: Manuel Guilherme Galmanus
+
+markdown: kramdown
+kramdown:
+  syntax_highlighter: rouge
+  input: GFM
+  hard_wrap: false
+
+url: "https://galmanus.github.io"
+baseurl: "/ssl-spec"
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+  - .gitignore
