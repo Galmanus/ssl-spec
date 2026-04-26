@@ -1,3 +1,9 @@
+---
+layout: default
+title: "SSL Language Reference"
+permalink: /docs/
+---
+
 # Soul Specification Language (SSL)
 ## Language Reference · v5.0
 

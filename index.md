@@ -95,7 +95,7 @@ Built by [Manuel Guilherme Galmanus](https://br.linkedin.com/in/galmanus) at Blu
 
 ## Documentation
 
-- [Language Reference (full spec)](./docs/index.md)
-- [Grammar (EBNF)](./docs/grammar.md)
+- [Language Reference (full spec)](./docs/)
+- [Grammar (EBNF)](./docs/)
 - [Examples](./examples/)
 - [Reference Implementation](./ref/)
