@@ -100,6 +100,52 @@ class Attribute:
 
 
 @dataclass
+class ToolDecl:
+    """One `allow X as Y` declaration parsed from an @tools block body."""
+    tool: str                          # registered tool name (e.g. "WebSearch")
+    alias: str = ""                    # local alias (defaults to tool name)
+    line: int = 0
+
+
+@dataclass
+class ToolManifest:
+    """Structured form of an @tools block per SSL v6 §4. Used by runtime."""
+    allows: list[ToolDecl] = field(default_factory=list)
+    deny_patterns: list[tuple[str, str]] = field(default_factory=list)  # (tool, pattern)
+    budget_daily_usd: float | None = None
+    budget_per_call_usd: float | None = None
+    log_all: bool = False
+    confirm_before: list[str] = field(default_factory=list)  # tool names requiring confirm
+    raw_lines_dropped: list[str] = field(default_factory=list)  # unparseable directives
+
+    def is_allowed(self, tool: str) -> bool:
+        """Check if a tool is in the allow list."""
+        return any(t.tool == tool or t.alias == tool for t in self.allows)
+
+    def deny_match(self, tool: str, content: str) -> str | None:
+        """Return the first deny pattern matching content for tool, or None."""
+        import re as _re_dm
+        for tname, pattern in self.deny_patterns:
+            if tname != tool:
+                continue
+            try:
+                # Pattern is a glob-ish substring check; for simplicity, use plain `in`
+                # plus shell-style * → .* regex.
+                rx = pattern.replace("*", ".*")
+                if _re_dm.search(rx, content):
+                    return pattern
+            except Exception:
+                if pattern in content:
+                    return pattern
+        return None
+
+    def is_empty(self) -> bool:
+        return (not self.allows and not self.deny_patterns
+                and self.budget_daily_usd is None and self.budget_per_call_usd is None
+                and not self.log_all and not self.confirm_before)
+
+
+@dataclass
 class SSLFile:
     path: str
     version: str = ""
@@ -110,6 +156,7 @@ class SSLFile:
     runtime_decls: dict[str, str] = field(default_factory=dict)
     blocks: list[Block] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    tool_manifest: ToolManifest = field(default_factory=lambda: ToolManifest())
     raw: str = ""
 
     def get_block(self, name: str) -> Block | None:
@@ -402,8 +449,21 @@ def _eval_when(expr: str, scope: dict) -> bool:
     py_expr = re.sub(r"!\s*=", "__NEQ__", py_expr)  # protect !=
     py_expr = re.sub(r"!", " not ", py_expr)
     py_expr = py_expr.replace("__NEQ__", "!=")
-    # Substitute identifiers
-    py_expr = re.sub(r"\b[a-zA-Z_][a-zA-Z0-9_.]*\b", _sub, py_expr)
+    # SSL convention is lowercase true/false/null. Normalize to Python casing
+    # BEFORE identifier substitution so they go through the PRESERVE path.
+    # (Bug found by 2026-05-09 behavioral eval: lowercase true silently
+    # resolved to repr(None) and broke @when=debug==true.)
+    py_expr = re.sub(r"\btrue\b", "True", py_expr)
+    py_expr = re.sub(r"\bfalse\b", "False", py_expr)
+    py_expr = re.sub(r"\bnull\b", "None", py_expr)
+    # Substitute identifiers ONLY in non-quoted segments — earlier version
+    # was rewriting "chat" inside string literals to repr(None).
+    parts = re.split(r'("[^"]*")', py_expr)
+    for i, part in enumerate(parts):
+        if part.startswith('"') and part.endswith('"'):
+            continue
+        parts[i] = re.sub(r"\b[a-zA-Z_][a-zA-Z0-9_.]*\b", _sub, part)
+    py_expr = "".join(parts).strip()
 
     try:
         tree = _pyast.parse(py_expr, mode="eval")
@@ -422,11 +482,19 @@ def _eval_when(expr: str, scope: dict) -> bool:
                 f"unsafe ast node {type(node).__name__} in when= expression {expr!r}"
             )
 
-    return bool(eval(
-        compile(tree, "<when>", mode="eval"),
-        {"__builtins__": {}},
-        {"True": True, "False": False, "None": None},
-    ))
+    try:
+        return bool(eval(
+            compile(tree, "<when>", mode="eval"),
+            {"__builtins__": {}},
+            {"True": True, "False": False, "None": None},
+        ))
+    except TypeError:
+        # Comparison against None (unbound runtime var) → treat block as not-applicable.
+        # E.g. @block[when=last_confidence<0.7] when last_confidence is None.
+        # Wrapped as SSLConditionError so _collect_blocks_v6 silently excludes the block.
+        raise SSLConditionError(
+            f"runtime comparison failed for {expr!r} (likely unbound identifier resolves to None)"
+        )
 
 
 # ─── Variable interpolation ─────────────────────────────────────────────────
@@ -763,6 +831,13 @@ def parse_string(raw: str, path: str = "<string>") -> SSLFile:
 
         raise SSLParseError(f"unexpected line: {line.rstrip()!r}", i + 1, path)
 
+    # v6 §4: extract structured tool manifest from any @tools block.
+    # If no @tools present, manifest stays empty (is_empty() = True).
+    for b in ssl.blocks:
+        if b.name == "tools" and not b.is_test:
+            ssl.tool_manifest = _parse_tool_manifest_from_body(b.body or b.body_raw)
+            break
+
     return ssl
 
 
@@ -850,6 +925,65 @@ def _chain_has_block(chain: list[SSLFile], block: str) -> bool:
             if b.name == block and not b.is_test:
                 return True
     return False
+
+
+def _parse_tool_manifest_from_body(body: str) -> ToolManifest:
+    """Parse an @tools block body into a structured ToolManifest.
+
+    Per SSL v6 §4. Lines are processed independently. Unparseable lines are
+    dropped to raw_lines_dropped (visible in ssl_linter --strict). Comments
+    (// ...) are stripped before parsing.
+    """
+    manifest = ToolManifest()
+    if not body:
+        return manifest
+
+    for raw in body.splitlines():
+        line = raw.split("//", 1)[0].strip()
+        if not line:
+            continue
+
+        # allow TOOL [as ALIAS]
+        m = re.match(r"^allow\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s+as\s+([A-Za-z_][A-Za-z0-9_]*))?\s*$", line)
+        if m:
+            manifest.allows.append(ToolDecl(
+                tool=m.group(1),
+                alias=m.group(2) or m.group(1),
+            ))
+            continue
+
+        # deny TOOL for "PATTERN"
+        m = re.match(r"^deny\s+([A-Za-z_][A-Za-z0-9_]*)\s+for\s+\"([^\"]+)\"\s*$", line)
+        if m:
+            manifest.deny_patterns.append((m.group(1), m.group(2)))
+            continue
+
+        # budget daily = N USD  /  budget per_call = N USD
+        m = re.match(r"^budget\s+(daily|per_call)\s*=\s*([\d.]+)\s*USD\s*$", line)
+        if m:
+            kind, amount = m.group(1), float(m.group(2))
+            if kind == "daily":
+                manifest.budget_daily_usd = amount
+            else:
+                manifest.budget_per_call_usd = amount
+            continue
+
+        # log all
+        if re.match(r"^log\s+all\s*$", line):
+            manifest.log_all = True
+            continue
+
+        # confirm before = [TOOL1, TOOL2, ...]
+        m = re.match(r"^confirm\s+before\s*=\s*\[([^\]]+)\]\s*$", line)
+        if m:
+            tools = [t.strip() for t in m.group(1).split(",") if t.strip()]
+            manifest.confirm_before.extend(tools)
+            continue
+
+        # Unrecognised — preserve for diagnostic, do not error
+        manifest.raw_lines_dropped.append(line)
+
+    return manifest
 
 
 # ─── Loader ─────────────────────────────────────────────────────────────────
@@ -1121,6 +1255,8 @@ def _cli() -> int:
     ap.add_argument("--search", action="append", default=[])
     ap.add_argument("--mode", choices=["prose", "structured"], default="prose")
     ap.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_PROMPT_TOKENS)
+    ap.add_argument("--tool-manifest", action="store_true",
+                    help="print structured @tools manifest as JSON")
     args = ap.parse_args()
 
     try:
@@ -1146,6 +1282,20 @@ def _cli() -> int:
     if args.compile:
         runtime = {"surface": args.surface} if args.surface else {}
         print(compile_prompt(chain, runtime=runtime, max_tokens=args.max_tokens, mode=args.mode))
+        return 0
+    if args.tool_manifest:
+        # Print the structured tool manifest of the leaf SSL file.
+        m = child.tool_manifest
+        print(json.dumps({
+            "allows": [{"tool": t.tool, "alias": t.alias, "line": t.line} for t in m.allows],
+            "deny_patterns": list(m.deny_patterns),
+            "budget_daily_usd": m.budget_daily_usd,
+            "budget_per_call_usd": m.budget_per_call_usd,
+            "log_all": m.log_all,
+            "confirm_before": m.confirm_before,
+            "raw_lines_dropped": m.raw_lines_dropped,
+            "is_empty": m.is_empty(),
+        }, indent=2, default=str))
         return 0
     if args.json:
         print(json.dumps(child.as_dict(), indent=2, ensure_ascii=False, default=str))
