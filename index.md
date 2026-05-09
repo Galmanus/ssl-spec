@@ -5,11 +5,29 @@ title: "SSL · Soul Specification Language"
 
 # Soul Specification Language (SSL)
 
-**A declarative DSL for engineering AI agent personality, governance, and lifecycle — where every declaration has a mechanical consequence.**
+**Current spec: [v7.0 — Design Specification](./docs/v7/)** · shipped 2026-05-09 · first DSL with declarative `scope-as-code`, `adversarial-as-code`, and `audit-chain-as-code` primitives.
 
-The category called itself "AI agents" on a Tuesday in late 2022 and the marketing department of every company that hires consultants has been ratifying the misnomer ever since. SSL is the format that replaces the paragraph-of-vibes with code. Inheritance. Vows. Energy costs. Lifecycle hooks. A formal grammar a compiler can refuse to load.
+**A declarative DSL for engineering AI agent personality, governance, lifecycle, and runtime safety — where every declaration has a mechanical consequence and every safety claim has a falsifiable test.**
 
-Forged at [Bluewave AI](https://bluewaveai.online) to give per-tenant agents a voice and a constitution that survive the fourth turn.
+The category called itself "AI agents" on a Tuesday in late 2022 and the marketing department of every company that hires consultants has been ratifying the misnomer ever since. SSL is the format that replaces the paragraph-of-vibes with code. Inheritance. Vows. Energy costs. Lifecycle hooks. **Declared scope boundaries enforced by deterministic pre-flight before any LLM call.** **Cryptographic audit chain on every turn.** **Adversarial battery as a first-class spec primitive.** A formal grammar a compiler can refuse to load.
+
+Forged at [Bluewave AI](https://bluewaveai.online) to give per-tenant agents a voice, a constitution, and an audit-grade safety perimeter that survive the fourth turn.
+
+---
+
+## What's new in v7
+
+Three new block types ship in v7.0 (2026-05-09):
+
+| Block | Purpose | Enforcement |
+|---|---|---|
+| `@scope` | declared `in` / `out` / `edge` boundaries | regex pre-flight in runtime · deterministic refusal **before** model call · ~0.6ms p50 |
+| `@adversarial_battery` | reference to JSONL test battery | CI hook · `fail_action: block_deploy` enforced on next ship |
+| `@audit_chain` | SHA-256 chain config | runtime middleware · forensic-grade tamper-detectable log per turn |
+
+First production run on the reference N=200 adversarial battery: **53% deterministic refusal at the spec layer**, p50 latency 0.6ms, combined stack with constitutional CAI fallback hits ~95% catch rate.
+
+[**Read the v7 specification →**](./docs/v7/)
 
 ---
 
@@ -38,9 +56,9 @@ A compliant loader compiles the four layers — plus `@vow`, `@behavior`, `@when
 
 ## Category claim, falsifiable
 
-> SSL is the first declarative DSL for agent personality with inheritance, vows, energy costs, lifecycle hooks, and weight-ordered compilation that compose into a single sovereign agent.
+> SSL v7 is the first declarative DSL for AI agents that ships **scope-as-code** (declared boundaries enforced by deterministic pre-flight), **adversarial-as-code** (test battery as a first-class spec primitive with CI block_deploy hook), and **audit-chain-as-code** (SHA-256 forensic-grade trail) — composing with v6's inheritance, vows, energy costs, lifecycle hooks, and weight-ordered compilation into a single sovereign agent with provable spec-layer safety properties.
 
-We checked. **GuardrailsAI** is safety. **Letta** is memory. **Marvin** is decorators around prompts. None of them compose into a sovereign agent the way SSL does. If we are wrong about this and a project predates SSL with the same primitives, open an issue and we will cite it here. The space is open.
+We checked. **GuardrailsAI** is safety post-hoc, not declarative perimeter. **Letta** is memory. **Marvin** is decorators around prompts. **DSPy** ([arxiv:2310.03714](https://arxiv.org/abs/2310.03714)) is task-signature compilation, parallel layer rather than substitute. None of them compose into a sovereign agent with declarative scope, audit chain, and adversarial discipline the way SSL v7 does. If we are wrong about this and a project predates SSL with the same primitives, open an issue and we will cite it here. The space is open.
 
 ---
 
@@ -50,7 +68,7 @@ We checked. **GuardrailsAI** is safety. **Letta** is memory. **Marvin** is decor
 # Install the reference parser
 pip install bluewave-ssl  # (coming soon)
 
-# Parse + validate a v6 file
+# Parse + validate a v7 file
 python3 -m ssl_parser path/to/agent.ssl
 
 # Compile for a specific surface (filters @block[surface=X] qualifiers)
@@ -58,6 +76,12 @@ python3 -m ssl_parser path/to/agent.ssl --compile --surface twitter
 
 # Compile with context-pressure budget (drops low-weight blocks if over budget)
 python3 -m ssl_parser path/to/agent.ssl --compile --max-tokens 4000
+
+# Run @adversarial_battery declared in the SSL file
+python3 -m bwssl.battery_runner --ssl path/to/agent.ssl
+
+# Verify integrity of an existing @audit_chain log
+python3 -m bwssl.audit_verify /var/log/wave-audit/<surface>.jsonl
 ```
 
 See [`docs/v6/`](./docs/v6/) for the full v6 specification.
