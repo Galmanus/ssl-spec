@@ -84,7 +84,9 @@ python3 -m bwssl.battery_runner --ssl path/to/agent.ssl
 python3 -m bwssl.audit_verify /var/log/wave-audit/<surface>.jsonl
 ```
 
-See [`docs/v6/`](./docs/v6/) for the full v6 specification.
+See [**`docs/v7/`**](./docs/v7/) for the full v7 specification (canonical reference, ~1900 lines: EBNF grammar · all 13 block primitives · compilation pipeline · runtime API · error catalog · threat model · operational deployment guide · battery methodology · production examples · FAQ · glossary · bibliography).
+
+Historical: [`docs/v6/`](./docs/v6/) · [`docs/`](./docs/) (v5).
 
 ---
 
