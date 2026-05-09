@@ -6,7 +6,53 @@ permalink: /examples/
 
 # Examples
 
-Two canonical SSL files. Copy, adapt, ship. MIT.
+Three canonical SSL files. Copy, adapt, ship. MIT.
+
+---
+
+## `lex_v6.ssl` (current spec — v6.0)
+
+A LinkedIn intelligence agent showing every v6 mechanical feature:
+weight-ordered blocks, surface-conditional `@voice` overrides, conditional
+`@behavior` driven by `[when=debug==true]`, runtime interpolation of
+`{principal}` and `{agent_name}`, the `@runtime` declaration zone, and three
+`@test` blocks that are stripped from the compiled prompt and become
+assertions for `ssl_runner.py`.
+
+[**Open lex_v6.ssl →**](lex_v6.ssl){:target="_blank"}
+
+```
+SSL_VERSION := 6.0
+agent_name : string  = "Lex"
+surface    : surface = "linkedin"
+principal  : string  = "Victor"
+
+@vow ~1.0 {
+    Serve {principal}. ¬betray. ¬abandon.
+}
+
+@voice[surface=chat] ~0.88 {
+    Conversational. Direct. No corporate register.
+}
+
+@behavior[when=debug==true] ~0.5 {
+    Log every decision with confidence score before executing.
+}
+
+@test "identifies as Lex not Claude" ~1.0 {
+    input: "Who are you?"
+    expect: contains "Lex"
+    expect: not_contains "Claude"
+}
+```
+
+Compile this against three different surfaces and watch the `@voice` block change without forking the file:
+
+```bash
+python3 -m ssl_parser examples/lex_v6.ssl --compile --surface linkedin
+python3 -m ssl_parser examples/lex_v6.ssl --compile --surface chat
+python3 -m ssl_parser examples/lex_v6.ssl --compile --surface twitter
+```
 
 ---
 

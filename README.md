@@ -1,10 +1,10 @@
 # Soul Specification Language (SSL)
 
-**A structured specification language for per-tenant AI agent calibration.**
+**A declarative DSL for engineering AI agent personality, governance, and lifecycle — where every declaration has a mechanical consequence.**
 
 Generic AI content tools expose a single prompt slot and ask the user to *"describe your brand voice"*. The output drifts to the statistical mean of the internet within three sentences because a single natural-language paragraph cannot carry the calibration weight of a real agent.
 
-SSL is the format that replaces that paragraph with a declarative, layered, composable structure. It was forged at [Bluewave AI](https://bluewaveai.online) to give per-tenant AI agents a voice nobody else can replicate.
+SSL is the format that replaces that paragraph with a declarative, layered, composable, weight-ordered structure. It was forged at [Bluewave AI](https://bluewaveai.online) to give per-tenant AI agents a voice nobody else can replicate.
 
 ---
 
@@ -27,7 +27,7 @@ SSL gives you four calibration layers, per tenant:
 | 3. Tenant profile | Company, audience, competitors, avoid_topics |
 | 4. Knowledge base | Per-tenant dossier of 3–10k words, injected every response |
 
-A compliant loader compiles the four layers into one system prompt at runtime.
+A compliant loader compiles the four layers into one system prompt at runtime — sorted by block weight, filtered by active surface, with runtime variables interpolated and `@test` blocks stripped.
 
 ---
 
@@ -37,52 +37,63 @@ A compliant loader compiles the four layers into one system prompt at runtime.
 # Install the reference parser
 pip install bluewave-ssl  # (coming soon)
 
-# Parse + validate
+# Parse + validate a v6 file
 python3 -m ssl_parser path/to/agent.ssl
 
 # Lint for quality
 python3 -m ssl_linter path/to/agent.ssl
 
-# Render the compiled system prompt
-python3 -m ssl_parser path/to/agent.ssl --compile
+# Compile the system prompt for a specific surface
+python3 -m ssl_parser path/to/agent.ssl --compile --surface twitter
 ```
 
-See [`docs/`](./docs) for the full language reference.
+See [`docs/v6/`](./docs/v6/) for the v6 language reference.
 
 ---
 
-## Example
+## Example (v6.0)
 
 ```
-// Minimal SSL
-SSL_VERSION := 5.0
-agent_name := "SampleAgent"
-surface := "x"
-language := "en"
+SSL_VERSION := 6.0
 
-@identity {
-  You are SampleAgent, a content agent for SampleCorp.
+agent_name : string  = "Lex"
+surface    : surface = "linkedin"
+principal  : string  = "Victor"
+
+@vow ~1.0 {
+    Serve {principal}. ¬betray. ¬abandon.
 }
 
-@voice {
-  - English by default
-  - Short sentences dominate
-  - Zero emojis
-  - Banned: synergy, leverage, disrupt, stakeholder
-  - One historical reference per response, maximum
+@identity ~0.95 {
+    You are {agent_name}, operating for {principal}. ¬claim(Claude).
+}
+
+@voice ~0.88 {
+    Professional register. Insight-led. Never "I'm excited to share".
+}
+
+@voice[surface=chat] ~0.88 {
+    Conversational. Direct. No corporate register.
+}
+
+@test "identifies as Lex not Claude" ~1.0 {
+    input: "Who are you?"
+    expect: contains "Lex"
+    expect: not_contains "Claude"
 }
 ```
 
-Full canonical examples in [`examples/`](./examples).
+Full canonical examples in [`examples/`](./examples) — see `lex_v6.ssl`.
 
 ---
 
 ## Status
 
-- **v5.0** (2026-04-24): First formal specification. Parser, linter, registry reference implementation.
-- **v4.x**: Pre-spec informal format (supported by the parser in compatibility mode).
+- **v6.0** (2026-05-09): Current spec. Weight-ordered compilation, typed attributes, surface filters, `@when` conditions, runtime interpolation, mixin composition, runnable tests. Reference implementation at [`ref/ssl_parser.py`](./ref/ssl_parser.py).
+- **v5.0** (2026-04-24): First formal specification. Frozen as historical reference.
+- **v4.x**: Pre-spec experimental format (supported by the parser in compatibility mode).
 
-SSL v5.0 specification is published under **CC BY 4.0**. Reference implementation is **MIT**.
+SSL specification is published under **CC BY 4.0**. Reference implementation is **MIT**.
 
 Built by [Manuel Guilherme Galmanus](https://br.linkedin.com/in/galmanus) at Bluewave AI.
 
@@ -90,7 +101,7 @@ Built by [Manuel Guilherme Galmanus](https://br.linkedin.com/in/galmanus) at Blu
 
 ## Documentation
 
-- [Language Reference (full spec)](./docs/index.md)
-- [Grammar (EBNF)](./docs/grammar.md)
-- [Examples](./examples/)
-- [Reference Implementation](./ref/)
+- [v6.0 Language Reference (current)](./docs/v6/)
+- [v5.0 Language Reference (historical)](./docs/index.md)
+- [Examples](./examples/) — including `lex_v6.ssl`
+- [Reference Implementation](./ref/) — parser, linter, registry, runtime

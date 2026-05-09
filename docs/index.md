@@ -5,10 +5,12 @@ permalink: /docs/
 ---
 
 # Soul Specification Language (SSL)
-## Language Reference · v5.0
+## Language Reference · v5.0 (historical)
 
-**Status:** normative · produced by Bluewave AI · released 2026-04-24
-**Audience:** engineers calibrating AI agents, anyone writing or reviewing `.ssl` files
+> **This is the v5.0 reference, kept as historical record.** The current specification is **[SSL v6.0](./v6/)** — weights are now load-bearing, types are validated at parse time, surface and `@when` qualifiers filter the compiled output, `@test` blocks strip from the prompt, and the parser is honest about which features are formally enforced versus which are prose the model reads as natural language.
+
+**Status:** historical · superseded by v6.0 on 2026-05-09 · originally released 2026-04-24
+**Audience:** engineers maintaining v5 agents, anyone migrating to v6
 **File extension:** `.ssl`
 **Encoding:** UTF-8, LF line endings
 
