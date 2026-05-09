@@ -1,15 +1,25 @@
 title: "SSL · Soul Specification Language"
-description: "Per-tenant AI agent calibration, formally specified."
-theme: jekyll-theme-minimal
-show_downloads: false
+description: "A declarative DSL for engineering AI agent personality, governance, and lifecycle — every declaration has a mechanical consequence."
 
 author: Manuel Guilherme Galmanus
+
+# Custom layout (no remote theme) — see _layouts/default.html + assets/css/yeezy.css
+# Editorial register matching bluewaveai.online (BONE/INK/KLEIN palette).
 
 markdown: kramdown
 kramdown:
   syntax_highlighter: rouge
   input: GFM
   hard_wrap: false
+
+plugins:
+  - jekyll-relative-links
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
 
 url: "https://galmanus.github.io"
 baseurl: "/ssl-spec"

@@ -31,7 +31,7 @@ jobs:
       - name: Install Jekyll
         run: |
           gem install jekyll -v 4.3.3 --no-document
-          gem install jekyll-theme-minimal --no-document
+          gem install jekyll-relative-links --no-document
       - name: Build with Jekyll
         run: |
           jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
